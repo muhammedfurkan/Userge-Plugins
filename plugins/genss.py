@@ -2,8 +2,10 @@ import os
 import time
 import random
 import asyncio
+
 from hachoir.metadata import extractMetadata as XMan
 from hachoir.parser import createParser as CPR
+
 from userge import userge, Message, Config
 from userge.utils import take_screen_shot, progress
 
@@ -11,7 +13,7 @@ from userge.utils import take_screen_shot, progress
 @userge.on_cmd("genss", about={
     'header': "Screen Shot Generator",
     'description': "Generate Random Screen Shots from any video "
-                   " **[NOTE: It no frame count is passed default"
+                   " **[NOTE: If no frame count is passed, default"
                    " value for number of ss is 5. ",
     'usage': "{tr}genss [No of SS] (optional) as reply to Video"})
 async def ss_gen(message: Message):

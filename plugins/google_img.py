@@ -1,9 +1,12 @@
-from google_images_search import GoogleImagesSearch as GIS
 import os
 import shutil
+
+from pyrogram import InputMediaPhoto
+from google_images_search import GoogleImagesSearch as GIS
+
 from userge import userge, Message
 
-PATH = "tem_img_down/"
+PATH = "temp_img_down/"
 GCS_API_KEY = os.environ.get("GCS_API_KEY", None)
 GCS_IMAGE_E_ID = os.environ.get("GCS_IMAGE_E_ID", None)
 
@@ -31,9 +34,12 @@ option and for "Sites to search" option select "Search the entire
     'usage': "{tr}gimg [Query]",
     'examples': "{tr}gimg Dogs"})
 async def google_img(message: Message):
-    if GCS_API_KEY and GCS_IMAGE_E_ID is None:
-        await message.edit(REQ_ERR)
+    if (GCS_API_KEY and GCS_IMAGE_E_ID) is None:
+        await message.edit(REQ_ERR, disable_web_page_preview=True)
         return
+    if os.path.exists(PATH):
+        shutil.rmtree(PATH, ignore_errors=True)
+
     fetcher = GIS(GCS_API_KEY, GCS_IMAGE_E_ID)
     query = message.input_str
     search = {'q': query,
@@ -46,10 +52,14 @@ async def google_img(message: Message):
     fetcher.search(search_params=search)
     for image in fetcher.results():
         image.download(PATH)
+    if not os.path.exists(PATH):
+        await message.edit("Oops, No Results Found")
+        return
+    ss = []
     for img in os.listdir(PATH):
         imgs = PATH + img
-        await userge.send_photo(
-            chat_id=message.chat.id,
-            photo=imgs)
+        ss.append(InputMediaPhoto(str(imgs)))
+    await message.reply_chat_action("upload_photo")
+    await message.reply_media_group(ss, True)
     shutil.rmtree(PATH, ignore_errors=True)
     await message.delete()

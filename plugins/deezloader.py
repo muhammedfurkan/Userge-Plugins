@@ -1,7 +1,12 @@
 import os
 import shutil
+
 import deezloader
+
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
 from userge import userge, Message
+from userge.utils.tools import humanbytes
 
 ARL_TOKEN = os.environ.get("ARL_TOKEN", None)
 PATH = 'deezdown_temp/'
@@ -80,13 +85,13 @@ async def deezload(message: Message):
 
     if '-sdl' in flags:
         if 'track/' in input_link:
-            await proper_trackdl(input_link, quality, message, loader, PATH, userge)
+            await proper_trackdl(input_link, quality, message, loader, PATH)
         elif 'album/' or 'playlist/' in input_link:
             await batch_dl(input_link, quality, message, loader, PATH, userge, to_zip)
     elif '-ddl' in flags:
         if 'track/' in input_link:
-            await proper_trackdl(input_link, quality, message, loader, PATH, userge)
-        elif 'album/' or 'playlist' in input_link:
+            await proper_trackdl(input_link, quality, message, loader, PATH)
+        elif 'album/' or 'playlist/' in input_link:
             await batch_dl(input_link, quality, message, loader, PATH, userge, to_zip)
 
     if '-dsong' in flags:
@@ -102,57 +107,48 @@ async def deezload(message: Message):
                 not_interface=True
             )
             await message.edit("Song found, Now Uploading 📤")
-            await userge.send_audio(
-                chat_id=message.chat.id,
-                audio=track
-            )
-        except:
+            await uload_tg(track, message)
+        except Exception:
             await message.edit("Song not Found 🚫")
     await message.delete()
     shutil.rmtree(PATH, ignore_errors=True)
 
 
-async def proper_trackdl(link, qual, msg, client, dir, u):
+async def proper_trackdl(link, qual, msg, client, dir_):
     if 'spotify' in link:
         await msg.edit("Trying to download song via Spotify Link 🥴")
         track = client.download_trackspo(
             link,
-            output=dir,
+            output=dir_,
             quality=qual,
             recursive_quality=True,
             recursive_download=True,
             not_interface=True
         )
         await msg.edit("Now Uploading 📤")
-        await u.send_audio(
-            chat_id=msg.chat.id,
-            audio=track
-        )
+        await uload_tg(track, msg)
     elif 'deezer' in link:
         await msg.edit("Trying to download song via Deezer Link 🥴")
         track = client.download_trackdee(
             link,
-            output=dir,
+            output=dir_,
             quality=qual,
             recursive_quality=True,
             recursive_download=True,
             not_interface=True
         )
         await msg.edit("Now Uploading 📤")
-        await u.send_audio(
-            chat_id=msg.chat.id,
-            audio=track
-        )
+        await uload_tg(track, msg)
 
 
-async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
+async def batch_dl(link, qual, msg, client, dir_, u, allow_zip):
     if 'spotify' in link:
         if 'album/' in link:
             await msg.edit("Trying to download album 🤧")
             if allow_zip:
                 _, zip_ = client.download_albumspo(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -167,24 +163,21 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
             else:
                 album_list = client.download_albumspo(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
                     not_interface=True,
                     zips=False)
                 await msg.edit("Uploading Tracks 📤")
-                for tracks in album_list:
-                    await u.send_audio(
-                        chat_id=msg.chat.id,
-                        audio=tracks
-                    )
+                for track in album_list:
+                    await uload_tg(track, msg)
         if 'playlist/' in link:
             await msg.edit("Trying to download Playlist 🎶")
             if allow_zip:
                 _, zip_ = client.download_playlistspo(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -199,7 +192,7 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
             else:
                 album_list = client.download_playlistspo(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -207,11 +200,8 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
                     zips=False
                 )
                 await msg.edit("Uploading Tracks 📤")
-                for tracks in album_list:
-                    await u.send_audio(
-                        chat_id=msg.chat.id,
-                        audio=tracks
-                    )
+                for track in album_list:
+                    await uload_tg(track, msg)
 
     if 'deezer' in link:
         if 'album/' in link:
@@ -219,7 +209,7 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
             if allow_zip:
                 _, zip_ = client.download_albumdee(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -234,7 +224,7 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
             else:
                 album_list = client.download_albumdee(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -242,17 +232,14 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
                     zips=False
                 )
                 await msg.edit("Uploading Tracks 📤")
-                for tracks in album_list:
-                    await u.send_audio(
-                        chat_id=msg.chat.id,
-                        audio=tracks
-                    )
+                for track in album_list:
+                    await uload_tg(track, msg)
         elif 'playlist/' in link:
             await msg.edit("Trying to download Playlist 🎶")
             if allow_zip:
                 _, zip_ = client.download_playlistdee(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -267,7 +254,7 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
             else:
                 album_list = client.download_playlistdee(
                     link,
-                    output=dir,
+                    output=dir_,
                     quality=qual,
                     recursive_quality=True,
                     recursive_download=True,
@@ -275,8 +262,32 @@ async def batch_dl(link, qual, msg, client, dir, u, allow_zip):
                     zips=False
                 )
                 await msg.edit("Uploading Tracks 📤")
-                for tracks in album_list:
-                    await u.send_audio(
-                        chat_id=msg.chat.id,
-                        audio=tracks
-                    )
+                for track in album_list:
+                    await uload_tg(track, msg)
+
+
+async def uload_tg(track: str, message: Message):
+    metadata = extractMetadata(createParser(track))
+    duration = 0
+    performer = ""
+    title = ""
+    if metadata.has("duration"):
+        duration = metadata.get("duration").seconds
+    if metadata.has("artist"):
+        # I don't know why Telegram calls it performer
+        performer = metadata.get("artist")
+    if metadata.has("title"):
+        title = metadata.get("title")
+    track_caption = ""
+    track_caption += os.path.basename(track)
+    track_caption += " ["
+    track_caption += humanbytes(os.stat(track).st_size)
+    track_caption += "]"
+    await message.reply_audio(
+        audio=track,
+        caption=track_caption,
+        duration=duration,
+        performer=performer,
+        title=title
+    )
+    os.remove(track)
